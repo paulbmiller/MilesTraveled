@@ -147,7 +147,7 @@ if __name__ == '__main__':
     
     # To try multiple combinations, copy these lines and modify the 3 variables
     """
-    n_input, n_preds, epochs = 12, 6, 1
+    n_input, n_preds, epochs = 12, 12, 20
     temp_test, strout, preds = lstm(n_input, n_preds, df, epochs)
     if len(temp_test) > len(test):
         test = pd.concat([test, temp_test.iloc[:-len(test)]])
@@ -156,6 +156,6 @@ if __name__ == '__main__':
     """
 
     
-    test.plot(figsize=(12, 5), title='Vehicle Miles Traveled')
+    test.plot(figsize=(12, 6), title='Vehicle Miles Traveled')
 
     print('RMSE errors: {}'.format(errors))
