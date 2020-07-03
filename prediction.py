@@ -9,7 +9,11 @@ import torch
 import torch.nn as nn
 from sklearn.preprocessing import MinMaxScaler
 from statsmodels.tools.eval_measures import rmse
+from pmdarima import auto_arima
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 
+import warnings
+warnings.filterwarnings("ignore")
 
 class LSTM(nn.Module):
     """Class for the LSTM model"""
@@ -32,6 +36,27 @@ class LSTM(nn.Module):
         lstm_out, self.hidden_cell = self.lstm(x, self.hidden_cell)
         predictions = self.linear(lstm_out.reshape(1, -1))
         return predictions
+
+
+def train_test_split(n_preds, df, scaling=False):
+    train = df[:-n_preds]
+    
+    # Test dataframe as a copy to not get a warning when we insert predictions
+    test = df[-n_preds:].copy()
+
+    sc = MinMaxScaler()
+    train_sc = sc.fit_transform(train)
+    test_sc = sc.transform(test)
+
+    inputs = []
+
+    for i in range(n_input, len(train)):
+        inputs.append((train_sc[i-n_input:i], train_sc[i]))
+    
+    if scaling:
+        return train, test, train_sc, test_sc, inputs, sc
+    else:
+        return train, test, None, None, inputs, None
 
 
 def lstm(n_input, n_preds, df, epochs):
@@ -65,20 +90,8 @@ def lstm(n_input, n_preds, df, epochs):
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     
-    train = df[:-n_preds]
-    
-    # Test dataframe as a copy to not get a warning when we insert predictions
-    test = df[-n_preds:].copy()
-
-    sc = MinMaxScaler()
-    train_sc = sc.fit_transform(train)
-    test_sc = sc.transform(test)
-
-    inputs = []
-
-    for i in range(n_input, len(train)):
-        inputs.append((train_sc[i-n_input:i], train_sc[i]))
-
+    train, test, train_sc, test_sc, inputs, sc = train_test_split(n_preds, df,
+                                                                  scaling=True)
 
     model.train()
     losses = []
@@ -130,6 +143,29 @@ def lstm(n_input, n_preds, df, epochs):
     return test, strout, preds_unsc
 
 
+def sarima(n_input, n_preds, df):
+    
+    # To get which SARIMA model to use
+    """
+    auto_arima(df['Value'], m=12).summary()
+    -> SARIMAX(1, 1, 2)x(2, 1, 2, 12)
+    """
+    train, test, _ , _ , inputs, _ = train_test_split(n_preds, df)
+    
+    model = SARIMAX(train['Value'], order = (1, 1, 2),
+                    seasonal_order=(2, 1, 2, 12))
+    results = model.fit()
+    
+    start=len(train)
+    end=len(train)+len(test)-1
+    predictions = results.predict(start=start, end=end, dynamic=False,
+                                  typ='levels')
+    predictions = predictions.tolist()
+    
+    return test, 'SARIMA ({}, {})'.format( n_input, n_preds), predictions
+    
+
+
 if __name__ == '__main__':
     df = pd.read_csv('Miles_Traveled.csv', index_col='DATE')
     df.index = pd.to_datetime(df.index)
@@ -145,10 +181,14 @@ if __name__ == '__main__':
     test.loc[:, strout] = preds
     errors.append(rmse(test['Value'], test[strout]))
     
+    _, strout, preds = sarima(n_input, n_preds, df)
+    test.loc[:, strout] = preds
+    errors.append(rmse(test['Value'], test[strout]))
+    
     # To try multiple combinations, copy these lines and modify the 3 variables
     """
     n_input, n_preds, epochs = 12, 12, 20
-    temp_test, strout, preds = lstm(n_input, n_preds, df, epochs)
+    temp_test, strout, preds = sarima(n_input, n_preds, df)
     if len(temp_test) > len(test):
         test = pd.concat([test, temp_test.iloc[:-len(test)]])
     test.loc[temp_test.index, strout] = preds
