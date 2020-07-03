@@ -185,7 +185,8 @@ if __name__ == '__main__':
     test.loc[:, strout] = preds
     errors.append(rmse(test['Value'], test[strout]))
     
-    # To try multiple combinations, copy these lines and modify the 3 variables
+    # To try multiple combinations for the LSTM, copy these lines and modify
+    # the 3 variables
     """
     n_input, n_preds, epochs = 12, 12, 20
     temp_test, strout, preds = sarima(n_input, n_preds, df)
