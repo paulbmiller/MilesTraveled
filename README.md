@@ -16,7 +16,7 @@ This will output the RMSE errors for the different models we decide to run with 
 We can choose to run multiple combinations by modifying these variables at the end of the script:
 - n_input: number of timestamps used for predictions)
 - n_preds: number of predictions (size of the test set)
-- epochs: number of training epochs
+- epochs: number of training epochs (for the LSTM model)
 
 ## Remarks
 ### LSTM
