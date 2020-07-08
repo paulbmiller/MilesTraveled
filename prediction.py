@@ -11,6 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 from statsmodels.tools.eval_measures import rmse
 from pmdarima import auto_arima
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+from fbprophet import Prophet
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -114,7 +115,6 @@ def lstm(n_input, n_preds, df, epochs):
         print('epoch: {} loss: {:.7f}'.format(i, L))
     
     current_batch = train_sc[-n_input:]
-    current_batch
     
     model.eval()
     preds = []
@@ -185,6 +185,22 @@ if __name__ == '__main__':
     test.loc[:, strout] = preds
     errors.append(rmse(test['Value'], test[strout]))
     
+    # Since the prophet model is so specific, we will work with it alone
+    df_prophet = pd.read_csv('Miles_Traveled.csv')
+    df_prophet.columns = ['ds', 'y']
+    df_prophet['ds'] = pd.to_datetime(df_prophet['ds'])
+    
+    train = df_prophet.iloc[:-n_preds]
+    
+    strout = 'Prophet'
+    m = Prophet()
+    m.fit(train)
+    future = m.make_future_dataframe(periods=12, freq='MS')
+    forecast = m.predict(future)
+    
+    test[strout] = forecast['yhat'].iloc[-n_preds:].values
+    errors.append(rmse(test['Value'], test[strout]))
+    
     # To try multiple combinations for the LSTM, copy these lines and modify
     # the 3 variables
     """
@@ -195,8 +211,8 @@ if __name__ == '__main__':
     test.loc[temp_test.index, strout] = preds
     errors.append(rmse(test['Value'], test[strout]))
     """
-
     
-    test.plot(figsize=(12, 6), title='Vehicle Miles Traveled')
+    test.plot(figsize=(12, 8), title='Vehicle Miles Traveled')
 
     print('RMSE errors: {}'.format(errors))
+
